@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AuditService } from "@/lib/services/audit-service";
 import { RecalculationService } from "@/lib/services/recalculation-service";
+import { roundMoney } from "@/lib/utils";
 
 const auditService = new AuditService();
 const recalculationService = new RecalculationService();
@@ -14,24 +15,42 @@ export class PenaltyService {
     });
   }
 
-  async create(input: { month: string; dseName: string; amount: number; reason: string; actorId?: string; tenantId?: string }) {
+  async create(input: { applicationNo: string; amount: number; reason: string; actorId?: string; tenantId?: string }) {
     const tenantId = input.tenantId ?? "default";
     const actorId = input.actorId
       ? (await prisma.user.findUnique({ where: { id: input.actorId }, select: { id: true } }))?.id
       : undefined;
+    const application = await prisma.application.findFirst({
+      where: {
+        tenantId,
+        applicationNo: input.applicationNo.trim(),
+        isArchived: false
+      },
+      select: {
+        applicationNo: true,
+        month: true,
+        dseName: true,
+        difference: true
+      }
+    });
+
+    if (!application) {
+      throw new Error("APPLICATION_NOT_FOUND");
+    }
 
     await prisma.monthPeriod.upsert({
-      where: { tenantId_month: { tenantId, month: input.month } },
+      where: { tenantId_month: { tenantId, month: application.month } },
       update: {},
-      create: { tenantId, month: input.month, status: "PENDING" }
+      create: { tenantId, month: application.month, status: "PENDING" }
     });
 
     const penalty = await prisma.penalty.create({
       data: {
         tenantId,
-        month: input.month,
-        dseName: input.dseName,
-        amount: new Prisma.Decimal(input.amount),
+        month: application.month,
+        dseName: application.dseName ?? "Unassigned",
+        applicationNo: application.applicationNo,
+        amount: new Prisma.Decimal(roundMoney(input.amount)),
         reason: input.reason,
         createdById: actorId
       }
@@ -43,11 +62,11 @@ export class PenaltyService {
       action: "penalty.created",
       entity: "penalty",
       entityId: penalty.id,
-      newValue: JSON.parse(JSON.stringify(penalty)) as Prisma.InputJsonValue
+      newValue: JSON.parse(JSON.stringify({ penalty, applicationProfit: Number(application.difference) })) as Prisma.InputJsonValue
     });
-    await recalculationService.refreshMonth(input.month, tenantId);
+    await recalculationService.refreshMonth(application.month, tenantId);
 
-    return penalty;
+    return { ...penalty, applicationProfit: Number(application.difference) };
   }
 
   async delete(id: string, actorId?: string, tenantId = "default") {

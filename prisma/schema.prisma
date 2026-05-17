@@ -162,6 +162,7 @@ model Penalty {
   tenantId    String   @default("default")
   month       String
   dseName     String
+  applicationNo String?
   amount      Decimal  @db.Decimal(14, 2)
   reason      String
   isActive    Boolean  @default(true)
@@ -172,6 +173,7 @@ model Penalty {
   monthPeriod MonthPeriod? @relation(fields: [tenantId, month], references: [tenantId, month])
 
   @@index([tenantId, month, dseName, isActive])
+  @@index([tenantId, applicationNo, isActive])
 }
 
 model BankRule {

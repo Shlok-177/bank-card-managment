@@ -30,6 +30,10 @@ export function toNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+export function roundMoney(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 export function sanitizeText(value: unknown) {
   return String(value ?? "")
     .trim()

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ApplicationRepository } from "@/lib/repositories/application-repository";
+import { roundMoney } from "@/lib/utils";
 import type { ReportFilters, ReportRow } from "@/types/domain";
 
 const applicationRepository = new ApplicationRepository();
@@ -21,14 +22,14 @@ export class ReportService {
       type === "bank" ? "bank" : type === "dse" ? "dseName" : type === "user" ? "userName" : "month";
     const grouped = new Map<string, ReportRow>();
     const appliedPenalties = new Map<string, Set<string>>();
-    const penaltyByDseMonth = new Map<string, { amount: number; reasons: string[] }>();
+    const penaltyByApplication = new Map<string, { amount: number; reasons: string[] }>();
 
     for (const penalty of penalties) {
-      const key = `${penalty.month}:${penalty.dseName}`;
-      const item = penaltyByDseMonth.get(key) ?? { amount: 0, reasons: [] };
-      item.amount += Number(penalty.amount);
+      const key = penalty.applicationNo ?? `${penalty.month}:${penalty.dseName}`;
+      const item = penaltyByApplication.get(key) ?? { amount: 0, reasons: [] };
+      item.amount = roundMoney(item.amount + Number(penalty.amount));
       item.reasons.push(penalty.reason);
-      penaltyByDseMonth.set(key, item);
+      penaltyByApplication.set(key, item);
     }
 
     for (const row of rows) {
@@ -47,14 +48,14 @@ export class ReportService {
         } satisfies ReportRow);
 
       existing.totalApplications += 1;
-      existing.totalPayout += Number(row.payout96);
-      existing.totalGiven += Number(row.given);
-      existing.totalProfit += Number(row.difference);
-      const penaltyKey = `${row.month}:${row.dseName ?? ""}`;
-      const penalty = penaltyByDseMonth.get(penaltyKey);
+      existing.totalPayout = roundMoney(existing.totalPayout + Number(row.payout96));
+      existing.totalGiven = roundMoney(existing.totalGiven + Number(row.given));
+      existing.totalProfit = roundMoney(existing.totalProfit + Number(row.difference));
+      const penaltyKey = row.applicationNo;
+      const penalty = penaltyByApplication.get(penaltyKey);
       const appliedForGroup = appliedPenalties.get(label) ?? new Set<string>();
       if (penalty && !appliedForGroup.has(penaltyKey)) {
-        existing.penaltyAmount += penalty.amount;
+        existing.penaltyAmount = roundMoney(existing.penaltyAmount + penalty.amount);
         existing.penaltyReasons = Array.from(new Set([...(existing.penaltyReasons ?? []), ...penalty.reasons]));
         appliedForGroup.add(penaltyKey);
         appliedPenalties.set(label, appliedForGroup);
@@ -63,7 +64,7 @@ export class ReportService {
     }
 
     for (const item of grouped.values()) {
-      item.finalProfit = item.totalProfit - item.penaltyAmount;
+      item.finalProfit = roundMoney(item.totalProfit - item.penaltyAmount);
     }
 
     const data = Array.from(grouped.values()).sort((a, b) => b.totalProfit - a.totalProfit);
@@ -94,23 +95,23 @@ export class ReportService {
       })
     ]);
 
-    const penaltyByDseMonth = new Map<string, { amount: number; reasons: string[] }>();
+    const penaltyByApplication = new Map<string, { amount: number; reasons: string[] }>();
     for (const penalty of penalties) {
-      const key = `${penalty.month}:${penalty.dseName}`;
-      const item = penaltyByDseMonth.get(key) ?? { amount: 0, reasons: [] };
-      item.amount += Number(penalty.amount);
+      const key = penalty.applicationNo ?? `${penalty.month}:${penalty.dseName}`;
+      const item = penaltyByApplication.get(key) ?? { amount: 0, reasons: [] };
+      item.amount = roundMoney(item.amount + Number(penalty.amount));
       item.reasons.push(penalty.reason);
-      penaltyByDseMonth.set(key, item);
+      penaltyByApplication.set(key, item);
     }
 
     const applied = new Set<string>();
     return rows.map((row) => {
-      const penaltyKey = `${row.month}:${row.dseName ?? ""}`;
+      const penaltyKey = row.applicationNo;
       const penalty = !applied.has(penaltyKey)
-        ? penaltyByDseMonth.get(penaltyKey) ?? { amount: 0, reasons: [] }
+        ? penaltyByApplication.get(penaltyKey) ?? { amount: 0, reasons: [] }
         : { amount: 0, reasons: [] };
       applied.add(penaltyKey);
-      const difference = Number(row.difference);
+      const difference = roundMoney(Number(row.difference));
       return {
         id: row.id,
         ...(row.rawData as Record<string, unknown>),
@@ -125,9 +126,9 @@ export class ReportService {
         "96%": Number(row.payout96),
         GIVEN: Number(row.given),
         Difference: difference,
-        Penalty: penalty.amount,
+        Penalty: roundMoney(penalty.amount),
         "Penalty Reason": penalty.reasons.join("; "),
-        "Final Profit": difference - penalty.amount
+        "Final Profit": roundMoney(difference - penalty.amount)
       };
     });
   }

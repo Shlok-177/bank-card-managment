@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { ApplicationRepository } from "@/lib/repositories/application-repository";
+import { roundMoney } from "@/lib/utils";
+import { ReportService } from "@/lib/services/report-service";
 
 const applicationRepository = new ApplicationRepository();
+const reportService = new ReportService();
 
 export class DashboardService {
   async getDashboard(tenantId = "default") {
@@ -11,22 +14,30 @@ export class DashboardService {
       _sum: { amount: true }
     });
     const applications = await prisma.application.findMany({
-      where: { tenantId },
+      where: { tenantId, isArchived: false },
       orderBy: { createdAt: "desc" },
-      take: 500
     });
 
-    const monthly = group(applications, "month");
+    const monthlyReport = await reportService.generate("monthly", {}, tenantId);
+    const monthly = monthlyReport.data.map((row) => ({
+      label: row.label,
+      applications: row.totalApplications,
+      payout: row.totalPayout,
+      given: row.totalGiven,
+      profit: row.finalProfit,
+      originalProfit: row.totalProfit,
+      penalty: row.penaltyAmount
+    }));
     const banks = group(applications, "bank");
     const dses = group(applications, "dseName");
 
     return {
       kpis: {
         totalApplications: aggregate._count.id,
-        totalPayout: Number(aggregate._sum.payout96 ?? 0),
-        totalGiven: Number(aggregate._sum.given ?? 0),
-        totalProfit: Number(aggregate._sum.difference ?? 0) - Number(penalties._sum.amount ?? 0),
-        penaltyAmount: Number(penalties._sum.amount ?? 0)
+        totalPayout: roundMoney(Number(aggregate._sum.payout96 ?? 0)),
+        totalGiven: roundMoney(Number(aggregate._sum.given ?? 0)),
+        totalProfit: roundMoney(Number(aggregate._sum.difference ?? 0) - Number(penalties._sum.amount ?? 0)),
+        penaltyAmount: roundMoney(Number(penalties._sum.amount ?? 0))
       },
       monthlyTrends: monthly,
       bankPerformance: banks,
@@ -46,11 +57,18 @@ function group<T extends { payout96: unknown; given: unknown; difference: unknow
     const label = String(row[key] ?? "Unassigned");
     const item = grouped.get(label) ?? { label, applications: 0, payout: 0, given: 0, profit: 0 };
     item.applications += 1;
-    item.payout += Number(row.payout96);
-    item.given += Number(row.given);
-    item.profit += Number(row.difference);
+    item.payout = roundMoney(item.payout + Number(row.payout96));
+    item.given = roundMoney(item.given + Number(row.given));
+    item.profit = roundMoney(item.profit + Number(row.difference));
     grouped.set(label, item);
   });
 
-  return Array.from(grouped.values()).sort((a, b) => b.profit - a.profit);
+  return Array.from(grouped.values())
+    .map((item) => ({
+      ...item,
+      payout: roundMoney(item.payout),
+      given: roundMoney(item.given),
+      profit: roundMoney(item.profit)
+    }))
+    .sort((a, b) => b.profit - a.profit);
 }
