@@ -6,6 +6,10 @@ const applicationRepository = new ApplicationRepository();
 export class DashboardService {
   async getDashboard(tenantId = "default") {
     const aggregate = await applicationRepository.aggregateDashboard(tenantId);
+    const penalties = await prisma.penalty.aggregate({
+      where: { tenantId, isActive: true },
+      _sum: { amount: true }
+    });
     const applications = await prisma.application.findMany({
       where: { tenantId },
       orderBy: { createdAt: "desc" },
@@ -21,7 +25,8 @@ export class DashboardService {
         totalApplications: aggregate._count.id,
         totalPayout: Number(aggregate._sum.payout96 ?? 0),
         totalGiven: Number(aggregate._sum.given ?? 0),
-        totalProfit: Number(aggregate._sum.difference ?? 0)
+        totalProfit: Number(aggregate._sum.difference ?? 0) - Number(penalties._sum.amount ?? 0),
+        penaltyAmount: Number(penalties._sum.amount ?? 0)
       },
       monthlyTrends: monthly,
       bankPerformance: banks,

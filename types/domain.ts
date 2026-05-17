@@ -39,6 +39,11 @@ export type UploadValidationResult = {
   validRows: ParsedApplicationRow[];
   errors: Array<{ rowNumber: number; field?: string; message: string }>;
   duplicateApplicationNos: string[];
+  existingMonth?: {
+    month: string;
+    activeRecords: number;
+    nextVersion: number;
+  };
 };
 
 export type ReportFilters = {
@@ -55,4 +60,21 @@ export type ReportRow = {
   totalPayout: number;
   totalGiven: number;
   totalProfit: number;
+  penaltyAmount: number;
+  finalProfit: number;
+  penaltyReasons?: string[];
+};
+
+export type UploadImportMode = "NEW" | "REPLACE" | "MERGE";
+
+export type EditableApplicationInput = {
+  dsa?: string;
+  applicationNo?: string;
+  customerName?: string;
+  cardType?: string;
+  bank?: string;
+  userName?: string;
+  dseName?: string;
+  payout96?: number;
+  given?: number;
 };

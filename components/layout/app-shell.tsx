@@ -2,16 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Building2, FileSpreadsheet, LayoutDashboard, LogOut, Menu, Moon, Settings, ShieldCheck, Users } from "lucide-react";
+import { BarChart3, Building2, CalendarDays, FileSpreadsheet, LayoutDashboard, LogOut, Menu, Moon, ReceiptText, Settings, ShieldCheck, Users } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/months", label: "Months", icon: CalendarDays },
   { href: "/upload", label: "Upload Excel", icon: FileSpreadsheet },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/analytics", label: "Analytics", icon: ShieldCheck },
+  { href: "/penalties", label: "Penalties", icon: ReceiptText },
   { href: "/bank-rules", label: "Bank Rules", icon: Building2 },
   { href: "/users", label: "Users", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings }

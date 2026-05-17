@@ -13,11 +13,12 @@ import { Label } from "@/components/ui/label";
 import { formatCurrency } from "@/lib/utils";
 
 type ReportRow = { label: string; totalApplications: number; totalPayout: number; totalGiven: number; totalProfit: number };
+type AnyRow = Record<string, unknown>;
 
 export default function ReportsPage() {
   const [type, setType] = useState("bank");
   const [filters, setFilters] = useState({ month: "", bank: "", dseName: "", cardType: "", userName: "" });
-  const [rows, setRows] = useState<ReportRow[]>([]);
+  const [rows, setRows] = useState<AnyRow[]>([]);
 
   const query = new URLSearchParams({ type, ...Object.fromEntries(Object.entries(filters).filter(([, value]) => value)) });
 
@@ -25,15 +26,34 @@ export default function ReportsPage() {
     fetch(`/api/reports?${query}`).then((response) => response.json()).then((data) => setRows(data.data ?? []));
   }, [type, filters.month, filters.bank, filters.dseName, filters.cardType, filters.userName]);
 
-  const columns = useMemo<ColumnDef<ReportRow>[]>(
-    () => [
-      { accessorKey: "label", header: "Group" },
-      { accessorKey: "totalApplications", header: "Applications" },
-      { accessorKey: "totalPayout", header: "Payout", cell: ({ row }) => formatCurrency(row.original.totalPayout) },
-      { accessorKey: "totalGiven", header: "Given", cell: ({ row }) => formatCurrency(row.original.totalGiven) },
-      { accessorKey: "totalProfit", header: "Profit", cell: ({ row }) => formatCurrency(row.original.totalProfit) }
-    ],
-    []
+  const columns = useMemo<ColumnDef<AnyRow>[]>(
+    () => {
+      if (type === "detail") {
+        const keys = rows.length ? Object.keys(rows[0]).filter((key) => key !== "id") : [
+          "Month", "DSA", "Application Ref No", "Customer Name", "Card Type", "Bank", "USER NAME", "DSE Name", "96%", "GIVEN", "Difference", "Penalty", "Final Profit"
+        ];
+        return keys.map((key) => ({
+          accessorKey: key,
+          header: key,
+          cell: ({ row }) => {
+            const value = row.original[key];
+            return typeof value === "number" && /96|given|difference|penalty|profit/i.test(key) ? formatCurrency(value) : String(value ?? "");
+          }
+        }));
+      }
+
+      return [
+        { accessorKey: "label", header: "Group" },
+        { accessorKey: "totalApplications", header: "Applications" },
+        { accessorKey: "totalPayout", header: "Payout", cell: ({ row }) => formatCurrency(Number(row.original.totalPayout)) },
+        { accessorKey: "totalGiven", header: "Given", cell: ({ row }) => formatCurrency(Number(row.original.totalGiven)) },
+        { accessorKey: "totalProfit", header: "Original Profit", cell: ({ row }) => formatCurrency(Number(row.original.totalProfit)) },
+        { accessorKey: "penaltyAmount", header: "Penalty", cell: ({ row }) => formatCurrency(Number(row.original.penaltyAmount ?? 0)) },
+        { accessorKey: "finalProfit", header: "Final Profit", cell: ({ row }) => formatCurrency(Number(row.original.finalProfit ?? row.original.totalProfit ?? 0)) },
+        { accessorKey: "penaltyReasons", header: "Penalty Reason", cell: ({ row }) => Array.isArray(row.original.penaltyReasons) ? row.original.penaltyReasons.join("; ") : "" }
+      ];
+    },
+    [type, rows]
   );
 
   return (
@@ -64,6 +84,7 @@ export default function ReportsPage() {
               <option value="user">User-wise</option>
               <option value="monthly">Monthly</option>
               <option value="profit">Profit</option>
+              <option value="detail">Complete Data</option>
             </select>
           </div>
           {Object.keys(filters).map((key) => (

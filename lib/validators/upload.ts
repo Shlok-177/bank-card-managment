@@ -3,7 +3,8 @@ import { z } from "zod";
 export const uploadMetadataSchema = z.object({
   month: z.string().min(3).max(32),
   uploadedById: z.string().min(1).optional(),
-  tenantId: z.string().min(1).default("default")
+  tenantId: z.string().min(1).default("default"),
+  mode: z.enum(["NEW", "REPLACE", "MERGE"]).default("NEW")
 });
 
 export const fileValidationSchema = z.object({

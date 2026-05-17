@@ -28,6 +28,22 @@ enum ReportType {
   USER_WISE
   MONTHLY_SUMMARY
   PROFIT
+  DETAIL
+}
+
+enum MonthStatus {
+  PENDING
+  UPLOADED
+  PROCESSING
+  COMPLETED
+  LOCKED
+  PARTIAL
+}
+
+enum UploadMode {
+  NEW
+  REPLACE
+  MERGE
 }
 
 model User {
@@ -42,6 +58,8 @@ model User {
   updatedAt    DateTime   @updatedAt
   uploads      Upload[]
   auditLogs    AuditLog[]
+  penalties    Penalty[]
+  edits        ApplicationVersion[]
 
   @@index([tenantId, role])
 }
@@ -52,6 +70,8 @@ model Upload {
   fileSize       Int
   month          String
   status         UploadStatus  @default(VALIDATING)
+  mode           UploadMode    @default(NEW)
+  version        Int           @default(1)
   totalRows      Int           @default(0)
   validRows      Int           @default(0)
   invalidRows    Int           @default(0)
@@ -63,8 +83,10 @@ model Upload {
   importedAt     DateTime?
   uploadedBy     User          @relation(fields: [uploadedById], references: [id])
   applications   Application[]
+  monthPeriod    MonthPeriod?  @relation(fields: [tenantId, month], references: [tenantId, month])
 
   @@index([tenantId, month, status])
+  @@unique([tenantId, month, version])
 }
 
 model Application {
@@ -73,7 +95,7 @@ model Application {
   tenantId       String   @default("default")
   month          String
   dsa            String?
-  applicationNo  String   @unique
+  applicationNo  String
   customerName   String
   cardType       String?
   bank           String
@@ -84,14 +106,72 @@ model Application {
   difference     Decimal  @db.Decimal(14, 2)
   bankFormula    Json?
   rawData        Json
+  isArchived     Boolean  @default(false)
+  archivedAt     DateTime?
+  archivedBy     String?
+  archiveReason  String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   upload         Upload   @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  versions       ApplicationVersion[]
 
   @@index([tenantId, month])
   @@index([tenantId, bank])
   @@index([tenantId, dseName])
   @@index([tenantId, userName])
+  @@index([tenantId, month, isArchived])
+  @@index([tenantId, applicationNo, isArchived])
+}
+
+model MonthPeriod {
+  id              String      @id @default(cuid())
+  tenantId        String      @default("default")
+  month           String
+  status          MonthStatus @default(PENDING)
+  expectedRecords Int?
+  uploadedRecords Int         @default(0)
+  activeVersion   Int         @default(0)
+  lastUploadAt    DateTime?
+  lockedAt        DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  uploads         Upload[]
+  penalties       Penalty[]
+
+  @@unique([tenantId, month])
+  @@index([tenantId, status])
+}
+
+model ApplicationVersion {
+  id            String   @id @default(cuid())
+  applicationId String
+  tenantId      String   @default("default")
+  changedById   String?
+  action        String
+  oldValue      Json?
+  newValue      Json?
+  createdAt     DateTime @default(now())
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  changedBy     User?    @relation(fields: [changedById], references: [id])
+
+  @@index([tenantId, applicationId, createdAt])
+}
+
+model Penalty {
+  id          String   @id @default(cuid())
+  tenantId    String   @default("default")
+  month       String
+  dseName     String
+  amount      Decimal  @db.Decimal(14, 2)
+  reason      String
+  isActive    Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  monthPeriod MonthPeriod? @relation(fields: [tenantId, month], references: [tenantId, month])
+
+  @@index([tenantId, month, dseName, isActive])
 }
 
 model BankRule {
@@ -141,6 +221,8 @@ model AuditLog {
   entity    String
   entityId  String?
   metadata  Json?
+  oldValue  Json?
+  newValue  Json?
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
