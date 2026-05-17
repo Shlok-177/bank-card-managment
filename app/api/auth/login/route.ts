@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isSecureRequest } from "@/lib/security/cookies";
 import { withApiGuard } from "@/lib/security/api";
 import { loginSchema } from "@/lib/validators/auth";
 
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
     response.cookies.set("bpms_session", user.id, {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: isSecureRequest(request),
       path: "/",
       maxAge: 60 * 60 * 8
     });
