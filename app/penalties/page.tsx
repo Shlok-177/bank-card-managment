@@ -16,6 +16,7 @@ type Penalty = {
   id: string;
   month: string;
   dseName: string;
+  applicationNo?: string;
   amount: string | number;
   reason: string;
   createdAt: string;
@@ -23,7 +24,9 @@ type Penalty = {
 
 export default function PenaltiesPage() {
   const [penalties, setPenalties] = useState<Penalty[]>([]);
-  const [form, setForm] = useState({ month: "Oct-2025", dseName: "", amount: "0", reason: "" });
+  const [form, setForm] = useState({ applicationNo: "", amount: "0", reason: "" });
+  const [message, setMessage] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const totalPenalty = penalties.reduce((sum, penalty) => sum + Number(penalty.amount), 0);
   const affectedDses = new Set(penalties.map((penalty) => penalty.dseName)).size;
 
@@ -36,25 +39,65 @@ export default function PenaltiesPage() {
   }, []);
 
   async function createPenalty() {
-    await fetch("/api/penalties", { method: "POST", body: JSON.stringify({ ...form, amount: Number(form.amount) }) });
-    setForm({ month: form.month, dseName: "", amount: "0", reason: "" });
+    setIsSaving(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/penalties", {
+        method: "POST",
+        body: JSON.stringify({ ...form, amount: Number(form.amount) })
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data.error) {
+        setMessage(data.error ?? "Unable to add penalty");
+        return;
+      }
+
+      setMessage(`Penalty added for ${data.applicationNo} / ${data.dseName}. Application profit: ${formatCurrency(Number(data.applicationProfit ?? 0))}`);
+      setForm({ applicationNo: "", amount: "0", reason: "" });
+      await load();
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function deletePenalty(id: string) {
+    setMessage("");
+    const response = await fetch(`/api/penalties?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || data.error) {
+      setMessage(data.error ?? "Unable to remove penalty");
+      return;
+    }
+
+    setMessage("Penalty removed from active reports.");
     await load();
   }
 
   const columns = useMemo<ColumnDef<Penalty>[]>(
     () => [
+      { accessorKey: "applicationNo", header: "Application No" },
       { accessorKey: "month", header: "Month" },
       { accessorKey: "dseName", header: "DSE" },
       { header: "Penalty", cell: ({ row }) => formatCurrency(Number(row.original.amount)) },
       { accessorKey: "reason", header: "Reason" },
-      { header: "Added", cell: ({ row }) => new Date(row.original.createdAt).toLocaleString() }
+      { header: "Added", cell: ({ row }) => new Date(row.original.createdAt).toLocaleString() },
+      {
+        header: "Action",
+        cell: ({ row }) => (
+          <Button size="sm" variant="destructive" onClick={() => deletePenalty(row.original.id)}>
+            Remove
+          </Button>
+        )
+      }
     ],
     []
   );
 
   return (
     <AppShell>
-      <PageHeader title="Penalty Management" description="Deduct DSE penalties from final payout reports with a clear reason trail." />
+      <PageHeader title="Penalty Management" description="Enter an application number; the system maps month, DSE, and profit automatically." />
 
       <div className="mb-5 grid gap-4 md:grid-cols-3">
         <Card>
@@ -85,28 +128,27 @@ export default function PenaltiesPage() {
             </div>
             <div>
               <CardTitle>Add Penalty</CardTitle>
-              <CardDescription>Example: Chirag Raval, Oct-2025, 500, Wrong document.</CardDescription>
+              <CardDescription>Example: APP-10002, 500, Wrong document.</CardDescription>
             </div>
           </div>
         </div>
-        <CardContent className="grid gap-4 pt-5 md:grid-cols-[160px_1fr_160px_1fr_auto]">
+        <CardContent className="grid gap-4 pt-5 md:grid-cols-[1fr_160px_1fr_auto]">
           <div className="space-y-2">
-            <Label>Month</Label>
-            <Input value={form.month} onChange={(event) => setForm((current) => ({ ...current, month: event.target.value }))} />
+            <Label>Application Number</Label>
+            <Input value={form.applicationNo} onChange={(event) => setForm((current) => ({ ...current, applicationNo: event.target.value }))} />
           </div>
           <div className="space-y-2">
-            <Label>DSE</Label>
-            <Input value={form.dseName} onChange={(event) => setForm((current) => ({ ...current, dseName: event.target.value }))} />
-          </div>
-          <div className="space-y-2">
-            <Label>Amount</Label>
+            <Label>Penalty</Label>
             <Input type="number" value={form.amount} onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))} />
           </div>
           <div className="space-y-2">
             <Label>Reason</Label>
             <Input value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} />
           </div>
-          <Button className="self-end" onClick={createPenalty} disabled={!form.month || !form.dseName || !form.reason}>Add Penalty</Button>
+          <Button className="self-end" onClick={createPenalty} disabled={isSaving || !form.applicationNo || !form.reason}>
+            {isSaving ? "Adding..." : "Add Penalty"}
+          </Button>
+          {message ? <p className="text-sm text-muted-foreground md:col-span-4">{message}</p> : null}
         </CardContent>
       </Card>
 

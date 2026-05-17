@@ -20,3 +20,14 @@ export async function POST(request: NextRequest) {
     });
   });
 }
+
+export async function DELETE(request: NextRequest) {
+  return withApiGuard(request, async () => {
+    const id = request.nextUrl.searchParams.get("id");
+    if (!id) {
+      return { error: "Penalty id is required" };
+    }
+
+    return penaltyService.delete(id, request.cookies.get("bpms_session")?.value);
+  });
+}
