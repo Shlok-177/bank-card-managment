@@ -26,7 +26,10 @@ export default function LoginPage() {
     setMessage("");
     const response = await fetch("/api/auth/login", { method: "POST", body: JSON.stringify(values) });
     const data = await response.json();
-    if (data.ok) router.push("/dashboard");
+    if (data.ok) {
+      const next = new URLSearchParams(window.location.search).get("next");
+      router.push(next || "/dashboard");
+    }
     else setMessage(data.error ?? "Login failed");
   }
 

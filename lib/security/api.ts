@@ -17,6 +17,10 @@ export function withApiGuard<T>(request: NextRequest, handler: () => Promise<T>)
         return NextResponse.json({ error: "Validation failed", details: error.flatten() }, { status: 400 });
       }
 
+      if (error instanceof Error && error.message === "UNAUTHORIZED") {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
       console.error(error);
       return NextResponse.json({ error: "Unexpected server error" }, { status: 500 });
     });

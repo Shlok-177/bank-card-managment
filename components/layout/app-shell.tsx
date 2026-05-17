@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BarChart3, Building2, CalendarDays, FileSpreadsheet, LayoutDashboard, LogOut, Menu, Moon, ReceiptText, Settings, ShieldCheck, Users } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,27 @@ const navigation = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { setTheme, theme } = useTheme();
+  const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((response) => {
+        if (response.status === 401) {
+          window.location.href = "/login";
+          return null;
+        }
+        return response.json();
+      })
+      .then((data) => setUser(data?.user ?? null))
+      .catch(() => {
+        window.location.href = "/login";
+      });
+  }, []);
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -67,13 +89,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {user ? (
+              <div className="hidden text-right sm:block">
+                <p className="text-sm font-medium">{user.name}</p>
+                <p className="text-xs text-muted-foreground">{user.role}</p>
+              </div>
+            ) : null}
             <Button variant="outline" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title="Toggle theme">
               <Moon className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" asChild title="Logout">
-              <Link href="/login">
-                <LogOut className="h-4 w-4" />
-              </Link>
+            <Button variant="ghost" size="icon" onClick={logout} title="Logout">
+              <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </header>
