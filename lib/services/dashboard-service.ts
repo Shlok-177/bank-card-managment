@@ -9,13 +9,9 @@ const reportService = new ReportService();
 export class DashboardService {
   async getDashboard(tenantId = "default") {
     const aggregate = await applicationRepository.aggregateDashboard(tenantId);
-    const penalties = await prisma.penalty.aggregate({
-      where: { tenantId, isActive: true },
-      _sum: { amount: true }
-    });
     const applications = await prisma.application.findMany({
       where: { tenantId, isArchived: false },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: "desc" }
     });
 
     const monthlyReport = await reportService.generate("monthly", {}, tenantId);
@@ -26,8 +22,10 @@ export class DashboardService {
       given: row.totalGiven,
       profit: row.finalProfit,
       originalProfit: row.totalProfit,
-      penalty: row.penaltyAmount
+      penalty: row.companyPenaltyAmount
     }));
+    const finalProfit = roundMoney(monthly.reduce((sum, row) => sum + row.profit, 0));
+    const companyPenalty = roundMoney(monthlyReport.data.reduce((sum, row) => sum + row.companyPenaltyAmount, 0));
     const banks = group(applications, "bank");
     const dses = group(applications, "dseName");
 
@@ -36,8 +34,8 @@ export class DashboardService {
         totalApplications: aggregate._count.id,
         totalPayout: roundMoney(Number(aggregate._sum.payout96 ?? 0)),
         totalGiven: roundMoney(Number(aggregate._sum.given ?? 0)),
-        totalProfit: roundMoney(Number(aggregate._sum.difference ?? 0) - Number(penalties._sum.amount ?? 0)),
-        penaltyAmount: roundMoney(Number(penalties._sum.amount ?? 0))
+        totalProfit: finalProfit,
+        penaltyAmount: companyPenalty
       },
       monthlyTrends: monthly,
       bankPerformance: banks,

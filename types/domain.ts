@@ -61,6 +61,9 @@ export type ReportRow = {
   totalGiven: number;
   totalProfit: number;
   penaltyAmount: number;
+  dsePenaltyAmount: number;
+  companyPenaltyAmount: number;
+  finalGiven: number;
   finalProfit: number;
   penaltyReasons?: string[];
 };

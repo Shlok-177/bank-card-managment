@@ -43,6 +43,9 @@ export class ReportService {
           totalGiven: 0,
           totalProfit: 0,
           penaltyAmount: 0,
+          dsePenaltyAmount: 0,
+          companyPenaltyAmount: 0,
+          finalGiven: 0,
           finalProfit: 0,
           penaltyReasons: []
         } satisfies ReportRow);
@@ -55,7 +58,12 @@ export class ReportService {
       const penalty = penaltyByApplication.get(penaltyKey);
       const appliedForGroup = appliedPenalties.get(label) ?? new Set<string>();
       if (penalty && !appliedForGroup.has(penaltyKey)) {
+        const given = Number(row.given);
+        const dseDeduction = roundMoney(Math.min(penalty.amount, given));
+        const companyDeduction = roundMoney(Math.max(penalty.amount - given, 0));
         existing.penaltyAmount = roundMoney(existing.penaltyAmount + penalty.amount);
+        existing.dsePenaltyAmount = roundMoney(existing.dsePenaltyAmount + dseDeduction);
+        existing.companyPenaltyAmount = roundMoney(existing.companyPenaltyAmount + companyDeduction);
         existing.penaltyReasons = Array.from(new Set([...(existing.penaltyReasons ?? []), ...penalty.reasons]));
         appliedForGroup.add(penaltyKey);
         appliedPenalties.set(label, appliedForGroup);
@@ -64,7 +72,8 @@ export class ReportService {
     }
 
     for (const item of grouped.values()) {
-      item.finalProfit = roundMoney(item.totalProfit - item.penaltyAmount);
+      item.finalGiven = roundMoney(item.totalGiven - item.dsePenaltyAmount);
+      item.finalProfit = roundMoney(item.totalProfit - item.companyPenaltyAmount);
     }
 
     const data = Array.from(grouped.values()).sort((a, b) => b.totalProfit - a.totalProfit);
@@ -112,6 +121,9 @@ export class ReportService {
         : { amount: 0, reasons: [] };
       applied.add(penaltyKey);
       const difference = roundMoney(Number(row.difference));
+      const given = roundMoney(Number(row.given));
+      const dseDeduction = roundMoney(Math.min(penalty.amount, given));
+      const companyDeduction = roundMoney(Math.max(penalty.amount - given, 0));
       return {
         id: row.id,
         ...(row.rawData as Record<string, unknown>),
@@ -124,11 +136,14 @@ export class ReportService {
         "USER NAME": row.userName,
         "DSE Name": row.dseName,
         "96%": Number(row.payout96),
-        GIVEN: Number(row.given),
+        GIVEN: given,
         Difference: difference,
         Penalty: roundMoney(penalty.amount),
+        "DSE Penalty Deduction": dseDeduction,
+        "Company Profit Deduction": companyDeduction,
+        "Final Given": roundMoney(given - dseDeduction),
         "Penalty Reason": penalty.reasons.join("; "),
-        "Final Profit": roundMoney(difference - penalty.amount)
+        "Final Profit": roundMoney(difference - companyDeduction)
       };
     });
   }

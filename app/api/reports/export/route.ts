@@ -7,8 +7,8 @@ const reportService = new ReportService();
 export async function GET(request: NextRequest) {
   const params = Object.fromEntries(request.nextUrl.searchParams.entries());
   const format = (params.format as "excel" | "csv" | "pdf") ?? "excel";
-  const report = await reportService.generate((params.type as "bank" | "dse" | "user" | "monthly" | "profit") ?? "bank", params);
-  const exported = await exportReport(format, report.data);
+  const rows = await reportService.detail(params);
+  const exported = await exportReport(format, rows);
 
   return new NextResponse(exported.body, {
     headers: {

@@ -48,7 +48,10 @@ export default function ReportsPage() {
         { accessorKey: "totalPayout", header: "Payout", cell: ({ row }) => formatCurrency(Number(row.original.totalPayout)) },
         { accessorKey: "totalGiven", header: "Given", cell: ({ row }) => formatCurrency(Number(row.original.totalGiven)) },
         { accessorKey: "totalProfit", header: "Original Profit", cell: ({ row }) => formatCurrency(Number(row.original.totalProfit)) },
-        { accessorKey: "penaltyAmount", header: "Penalty", cell: ({ row }) => formatCurrency(Number(row.original.penaltyAmount ?? 0)) },
+        { accessorKey: "penaltyAmount", header: "Total Penalty", cell: ({ row }) => formatCurrency(Number(row.original.penaltyAmount ?? 0)) },
+        { accessorKey: "dsePenaltyAmount", header: "DSE Deduction", cell: ({ row }) => formatCurrency(Number(row.original.dsePenaltyAmount ?? 0)) },
+        { accessorKey: "companyPenaltyAmount", header: "Profit Deduction", cell: ({ row }) => formatCurrency(Number(row.original.companyPenaltyAmount ?? 0)) },
+        { accessorKey: "finalGiven", header: "Final Given", cell: ({ row }) => formatCurrency(Number(row.original.finalGiven ?? row.original.totalGiven ?? 0)) },
         { accessorKey: "finalProfit", header: "Final Profit", cell: ({ row }) => formatCurrency(Number(row.original.finalProfit ?? row.original.totalProfit ?? 0)) },
         { accessorKey: "penaltyReasons", header: "Penalty Reason", cell: ({ row }) => Array.isArray(row.original.penaltyReasons) ? row.original.penaltyReasons.join("; ") : "" }
       ];
