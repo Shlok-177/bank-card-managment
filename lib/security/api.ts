@@ -25,6 +25,10 @@ export function withApiGuard<T>(request: NextRequest, handler: () => Promise<T>)
         return NextResponse.json({ error: "Application number not found in active uploaded data" }, { status: 404 });
       }
 
+      if (error instanceof Error && error.message === "PENALTY_ALREADY_EXISTS") {
+        return NextResponse.json({ error: "A penalty already exists for this application number. Remove it first to add a new one." }, { status: 409 });
+      }
+
       console.error(error);
       return NextResponse.json({ error: "Unexpected server error" }, { status: 500 });
     });

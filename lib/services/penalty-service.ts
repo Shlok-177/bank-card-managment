@@ -38,6 +38,19 @@ export class PenaltyService {
       throw new Error("APPLICATION_NOT_FOUND");
     }
 
+    const existingPenalty = await prisma.penalty.findFirst({
+      where: {
+        tenantId,
+        applicationNo: application.applicationNo,
+        isActive: true
+      },
+      select: { id: true }
+    });
+
+    if (existingPenalty) {
+      throw new Error("PENALTY_ALREADY_EXISTS");
+    }
+
     await prisma.monthPeriod.upsert({
       where: { tenantId_month: { tenantId, month: application.month } },
       update: {},
